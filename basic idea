@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-
 # Define a custom layer for quasipolynomial synapses
 class QuasiPolynomialSynapse(nn.Module):
     def __init__(self, input_size, output_size, degree=2):
