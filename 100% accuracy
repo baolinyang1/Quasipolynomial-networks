@@ -1,0 +1,78 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+# Define a custom layer for quasipolynomial synapses
+class QuasiPolynomialSynapse(nn.Module):
+    def __init__(self, input_size, output_size, degree=2):
+        super(QuasiPolynomialSynapse, self).__init__()
+        self.input_size = input_size
+        self.output_size = output_size
+        self.degree = degree
+        self.weights = nn.Parameter(torch.randn(output_size, input_size, degree))
+        self.bias = nn.Parameter(torch.randn(output_size))
+
+    def forward(self, x):
+        # Compute the quasipolynomial terms
+        x_expanded = torch.stack([x ** (i + 1) for i in range(self.degree)], dim=-1)
+        output = torch.einsum('bij,kij->bk', x_expanded, self.weights) + self.bias
+        return output
+
+# Define the neural network model
+class QuasiPolynomialNet(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size):
+        super(QuasiPolynomialNet, self).__init__()
+        self.synapse1 = QuasiPolynomialSynapse(input_size, hidden_size)
+        self.synapse2 = QuasiPolynomialSynapse(hidden_size, output_size)
+
+    def forward(self, x):
+        x = torch.relu(self.synapse1(x))
+        x = self.synapse2(x)
+        return x
+
+# Sample data
+x = torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]])
+y = torch.tensor([[1.0], [0.0]])
+
+# Initialize the model, loss function and optimizer
+model = QuasiPolynomialNet(input_size=3, hidden_size=5, output_size=1)
+criterion = nn.MSELoss()
+optimizer = optim.Adam(model.parameters(), lr=0.01)
+
+# Training loop
+for epoch in range(9000):
+    optimizer.zero_grad()
+    outputs = model(x)
+    loss = criterion(outputs, y)
+    loss.backward()
+    optimizer.step()
+    if epoch % 1000 == 0:
+        print(f'Epoch [{epoch}/9000], Loss: {loss.item():.4f}')
+
+# Function to calculate accuracy based on a threshold
+def calculate_accuracy(predictions, targets, threshold=0.05):
+    correct_predictions = (torch.abs(predictions - targets) < threshold).float()
+    accuracy = correct_predictions.mean().item()
+    return accuracy
+
+# Evaluating the model
+with torch.no_grad():
+    predicted = model(x)
+    mse = criterion(predicted, y)
+    rmse = torch.sqrt(mse)
+    r2 = 1 - mse / torch.var(y)
+    accuracy = calculate_accuracy(predicted, y) * 100  # Convert to percentage
+
+    print(f'MSE: {mse.item():.4f}')
+    print(f'RMSE: {rmse.item():.4f}')
+    print(f'R²: {r2.item():.4f}')
+    print(f'Accuracy: {accuracy:.2f}%')
+
+# Generating larger sample input for testing
+large_test_input = torch.randn(10, 3)  # Generates a 10x3 tensor with random values
+
+# Testing the model
+with torch.no_grad():
+    test_output = model(large_test_input)
+    print("Large Test Input:\n", large_test_input)
+    print("Test Output:\n", test_output)
